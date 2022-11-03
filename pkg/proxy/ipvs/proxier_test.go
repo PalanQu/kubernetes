@@ -131,7 +131,8 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 	// initialize ipsetList with all sets we needed
 	ipsetList := make(map[string]*IPSet)
 	for _, is := range ipsetInfo {
-		ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, false, is.comment)
+		set, _ := NewIPSet(ipset, is.name, is.setType, false, is.comment)
+		ipsetList[is.name] = set
 	}
 	p := &Proxier{
 		exec:                  fexec,

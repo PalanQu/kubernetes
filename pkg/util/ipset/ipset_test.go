@@ -171,9 +171,9 @@ func TestDestroyAllSets(t *testing.T) {
 
 func TestCreateSet(t *testing.T) {
 	testSet := IPSet{
-		Name:       "FOOBAR",
-		SetType:    HashIPPort,
-		HashFamily: ProtocolFamilyIPV4,
+		name:       "FOOBAR",
+		setType:    HashIPPort,
+		hashFamily: ProtocolFamilyIPV4,
 	}
 
 	fcmd := fakeexec.FakeCmd{
@@ -197,7 +197,7 @@ func TestCreateSet(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Create with ignoreExistErr = false, expect success
-	err := runner.CreateSet(&testSet, false)
+	err := runner.CreateSet(testSet, false)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -208,7 +208,7 @@ func TestCreateSet(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	// Create with ignoreExistErr = true, expect success
-	err = runner.CreateSet(&testSet, true)
+	err = runner.CreateSet(testSet, true)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -219,7 +219,7 @@ func TestCreateSet(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Create with ignoreExistErr = false, expect failure
-	err = runner.CreateSet(&testSet, false)
+	err = runner.CreateSet(testSet, false)
 	if err == nil {
 		t.Errorf("expected failure, got nil")
 	}
@@ -227,7 +227,7 @@ func TestCreateSet(t *testing.T) {
 
 var testCases = []struct {
 	entry                *Entry
-	set                  *IPSet
+	set                  IPSet
 	addCombinedOutputLog [][]string
 	delCombinedOutputLog []string
 }{
@@ -238,8 +238,8 @@ var testCases = []struct {
 			Protocol: ProtocolUDP,
 			SetType:  HashIPPort,
 		},
-		set: &IPSet{
-			Name: "ZERO",
+		set: IPSet{
+			name: "ZERO",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "ZERO", "192.168.1.1,udp:53"},
@@ -254,8 +254,8 @@ var testCases = []struct {
 			Protocol: ProtocolTCP,
 			SetType:  HashIPPort,
 		},
-		set: &IPSet{
-			Name: "UN",
+		set: IPSet{
+			name: "UN",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "UN", "192.168.1.2,tcp:80"},
@@ -271,8 +271,8 @@ var testCases = []struct {
 			SetType:  HashIPPortIP,
 			IP2:      "10.20.30.1",
 		},
-		set: &IPSet{
-			Name: "DEUX",
+		set: IPSet{
+			name: "DEUX",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "DEUX", "192.168.1.3,udp:53,10.20.30.1"},
@@ -288,8 +288,8 @@ var testCases = []struct {
 			SetType:  HashIPPortIP,
 			IP2:      "10.20.30.2",
 		},
-		set: &IPSet{
-			Name: "TROIS",
+		set: IPSet{
+			name: "TROIS",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "TROIS", "192.168.1.4,tcp:80,10.20.30.2"},
@@ -305,8 +305,8 @@ var testCases = []struct {
 			SetType:  HashIPPortNet,
 			Net:      "10.20.30.0/24",
 		},
-		set: &IPSet{
-			Name: "QUATRE",
+		set: IPSet{
+			name: "QUATRE",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "QUATRE", "192.168.1.5,udp:53,10.20.30.0/24"},
@@ -322,8 +322,8 @@ var testCases = []struct {
 			SetType:  HashIPPortNet,
 			Net:      "10.20.40.0/24",
 		},
-		set: &IPSet{
-			Name: "CINQ",
+		set: IPSet{
+			name: "CINQ",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "CINQ", "192.168.1.6,tcp:80,10.20.40.0/24"},
@@ -337,8 +337,8 @@ var testCases = []struct {
 			Protocol: ProtocolTCP,
 			SetType:  BitmapPort,
 		},
-		set: &IPSet{
-			Name: "SIX",
+		set: IPSet{
+			name: "SIX",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "SIX", "80"},
@@ -353,8 +353,8 @@ var testCases = []struct {
 			Protocol: ProtocolSCTP,
 			SetType:  HashIPPort,
 		},
-		set: &IPSet{
-			Name: "SETTE",
+		set: IPSet{
+			name: "SETTE",
 		},
 		addCombinedOutputLog: [][]string{
 			{"ipset", "add", "SETTE", "192.168.1.2,sctp:80"},
@@ -436,7 +436,7 @@ func TestDelEntry(t *testing.T) {
 		}
 		runner := New(&fexec)
 
-		err := runner.DelEntry(testCases[i].entry.String(), testCases[i].set.Name)
+		err := runner.DelEntry(testCases[i].entry.String(), testCases[i].set.name)
 		if err != nil {
 			t.Errorf("expected success, got %v", err)
 		}
@@ -446,7 +446,7 @@ func TestDelEntry(t *testing.T) {
 		if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll(testCases[i].delCombinedOutputLog...) {
 			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 		}
-		err = runner.DelEntry(testCases[i].entry.String(), testCases[i].set.Name)
+		err = runner.DelEntry(testCases[i].entry.String(), testCases[i].set.name)
 		if err == nil {
 			t.Errorf("expected failure, got nil")
 		}
@@ -551,7 +551,7 @@ func TestTestEntryIPv6(t *testing.T) {
 
 func TestListEntries(t *testing.T) {
 
-	output := `Name: foobar
+	output := `name: foobar
 Type: hash:ip,port
 Revision: 2
 Header: family inet hashsize 1024 maxelem 65536
@@ -561,7 +561,7 @@ Members:
 192.168.1.2,tcp:8080
 192.168.1.1,udp:53`
 
-	emptyOutput := `Name: KUBE-NODE-PORT
+	emptyOutput := `name: KUBE-NODE-PORT
 Type: bitmap:port
 Revision: 1
 Header: range 0-65535
@@ -897,91 +897,91 @@ func Test_validateProtocol(t *testing.T) {
 
 func TestValidateIPSet(t *testing.T) {
 	testCases := []struct {
-		ipset     *IPSet
+		ipset     IPSet
 		expectErr bool
 		desc      string
 	}{
 		{ // case[0]
-			ipset: &IPSet{
-				Name:       "test",
-				SetType:    HashIPPort,
-				HashFamily: ProtocolFamilyIPV4,
-				HashSize:   1024,
-				MaxElem:    1024,
+			ipset: IPSet{
+				name:       "test",
+				setType:    HashIPPort,
+				hashFamily: ProtocolFamilyIPV4,
+				hashSize:   1024,
+				maxElem:    1024,
 			},
 			expectErr: false,
 			desc:      "No Port range",
 		},
 		{ // case[1]
-			ipset: &IPSet{
-				Name:       "SET",
-				SetType:    BitmapPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   65535,
-				MaxElem:    2048,
-				PortRange:  DefaultPortRange,
+			ipset: IPSet{
+				name:       "SET",
+				setType:    BitmapPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   65535,
+				maxElem:    2048,
+				portRange:  DefaultPortRange,
 			},
 			expectErr: false,
 			desc:      "control case",
 		},
 		{ // case[2]
-			ipset: &IPSet{
-				Name:       "foo",
-				SetType:    BitmapPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   65535,
-				MaxElem:    2048,
+			ipset: IPSet{
+				name:       "foo",
+				setType:    BitmapPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   65535,
+				maxElem:    2048,
 			},
 			expectErr: true,
 			desc:      "should specify right port range for bitmap type set",
 		},
 		{ // case[3]
-			ipset: &IPSet{
-				Name:       "bar",
-				SetType:    HashIPPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   0,
-				MaxElem:    2048,
+			ipset: IPSet{
+				name:       "bar",
+				setType:    HashIPPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   0,
+				maxElem:    2048,
 			},
 			expectErr: true,
 			desc:      "wrong hash size number",
 		},
 		{ // case[4]
-			ipset: &IPSet{
-				Name:       "baz",
-				SetType:    HashIPPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   1024,
-				MaxElem:    -1,
+			ipset: IPSet{
+				name:       "baz",
+				setType:    HashIPPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   1024,
+				maxElem:    -1,
 			},
 			expectErr: true,
 			desc:      "wrong hash max elem number",
 		},
 		{ // case[5]
-			ipset: &IPSet{
-				Name:       "baz",
-				SetType:    HashIPPortNet,
-				HashFamily: "ip",
-				HashSize:   1024,
-				MaxElem:    1024,
+			ipset: IPSet{
+				name:       "baz",
+				setType:    HashIPPortNet,
+				hashFamily: "ip",
+				hashSize:   1024,
+				maxElem:    1024,
 			},
 			expectErr: true,
 			desc:      "wrong protocol",
 		},
 		{ // case[6]
-			ipset: &IPSet{
-				Name:       "foo-bar",
-				SetType:    "xxx",
-				HashFamily: ProtocolFamilyIPV4,
-				HashSize:   1024,
-				MaxElem:    1024,
+			ipset: IPSet{
+				name:       "foo-bar",
+				setType:    "xxx",
+				hashFamily: ProtocolFamilyIPV4,
+				hashSize:   1024,
+				maxElem:    1024,
 			},
 			expectErr: true,
 			desc:      "wrong set type",
 		},
 	}
 	for i := range testCases {
-		err := testCases[i].ipset.Validate()
+		err := testCases[i].ipset.validate()
 		if err != nil {
 			if !testCases[i].expectErr {
 				t.Errorf("case [%d]: unexpected mismatch, expect error[%v], got error[%v], desc: %s", i, testCases[i].expectErr, err, testCases[i].desc)
@@ -994,64 +994,64 @@ func TestValidateIPSet(t *testing.T) {
 func Test_setIPSetDefaults(t *testing.T) {
 	testCases := []struct {
 		name   string
-		set    *IPSet
-		expect *IPSet
+		set    IPSet
+		expect IPSet
 	}{
 		{
 			name: "test all the IPSet fields not present",
-			set: &IPSet{
-				Name: "test1",
+			set: IPSet{
+				name: "test1",
 			},
-			expect: &IPSet{
-				Name:       "test1",
-				SetType:    HashIPPort,
-				HashFamily: ProtocolFamilyIPV4,
-				HashSize:   1024,
-				MaxElem:    65536,
-				PortRange:  DefaultPortRange,
+			expect: IPSet{
+				name:       "test1",
+				setType:    HashIPPort,
+				hashFamily: ProtocolFamilyIPV4,
+				hashSize:   1024,
+				maxElem:    65536,
+				portRange:  DefaultPortRange,
 			},
 		},
 		{
 			name: "test all the IPSet fields present",
-			set: &IPSet{
-				Name:       "test2",
-				SetType:    BitmapPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   65535,
-				MaxElem:    2048,
-				PortRange:  DefaultPortRange,
+			set: IPSet{
+				name:       "test2",
+				setType:    BitmapPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   65535,
+				maxElem:    2048,
+				portRange:  DefaultPortRange,
 			},
-			expect: &IPSet{
-				Name:       "test2",
-				SetType:    BitmapPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   65535,
-				MaxElem:    2048,
-				PortRange:  DefaultPortRange,
+			expect: IPSet{
+				name:       "test2",
+				setType:    BitmapPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   65535,
+				maxElem:    2048,
+				portRange:  DefaultPortRange,
 			},
 		},
 		{
 			name: "test part of the IPSet fields present",
-			set: &IPSet{
-				Name:       "test3",
-				SetType:    BitmapPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   65535,
+			set: IPSet{
+				name:       "test3",
+				setType:    BitmapPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   65535,
 			},
-			expect: &IPSet{
-				Name:       "test3",
-				SetType:    BitmapPort,
-				HashFamily: ProtocolFamilyIPV6,
-				HashSize:   65535,
-				MaxElem:    65536,
-				PortRange:  DefaultPortRange,
+			expect: IPSet{
+				name:       "test3",
+				setType:    BitmapPort,
+				hashFamily: ProtocolFamilyIPV6,
+				hashSize:   65535,
+				maxElem:    65536,
+				portRange:  DefaultPortRange,
 			},
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			test.set.setIPSetDefaults()
+			setIPSetDefaults(&test.set)
 			if !reflect.DeepEqual(test.set, test.expect) {
 				t.Errorf("expected ipset struct: %v, got ipset struct: %v", test.expect, test.set)
 			}
@@ -1060,13 +1060,13 @@ func Test_setIPSetDefaults(t *testing.T) {
 }
 
 func Test_checkIPandProtocol(t *testing.T) {
-	testset := &IPSet{
-		Name:       "test1",
-		SetType:    HashIPPort,
-		HashFamily: ProtocolFamilyIPV4,
-		HashSize:   1024,
-		MaxElem:    65536,
-		PortRange:  DefaultPortRange,
+	testset := IPSet{
+		name:       "test1",
+		setType:    HashIPPort,
+		hashFamily: ProtocolFamilyIPV4,
+		hashSize:   1024,
+		maxElem:    65536,
+		portRange:  DefaultPortRange,
 	}
 
 	testCases := []struct {
@@ -1240,7 +1240,7 @@ func Test_parsePortRange(t *testing.T) {
 func TestValidateEntry(t *testing.T) {
 	testCases := []struct {
 		entry *Entry
-		set   *IPSet
+		set   IPSet
 		valid bool
 		desc  string
 	}{
@@ -1248,8 +1248,8 @@ func TestValidateEntry(t *testing.T) {
 			entry: &Entry{
 				SetType: BitmapPort,
 			},
-			set: &IPSet{
-				PortRange: DefaultPortRange,
+			set: IPSet{
+				portRange: DefaultPortRange,
 			},
 			valid: true,
 			desc:  "port number can be empty, default is 0. And port number is in the range of its ipset's port range",
@@ -1259,8 +1259,8 @@ func TestValidateEntry(t *testing.T) {
 				SetType: BitmapPort,
 				Port:    0,
 			},
-			set: &IPSet{
-				PortRange: DefaultPortRange,
+			set: IPSet{
+				portRange: DefaultPortRange,
 			},
 			valid: true,
 			desc:  "port number can be 0. And port number is in the range of its ipset's port range",
@@ -1278,9 +1278,9 @@ func TestValidateEntry(t *testing.T) {
 				SetType: BitmapPort,
 				Port:    1080,
 			},
-			set: &IPSet{
-				Name:      "baz",
-				PortRange: DefaultPortRange,
+			set: IPSet{
+				name:      "baz",
+				portRange: DefaultPortRange,
 			},
 			desc:  "port number is in the range of its ipset's port range",
 			valid: true,
@@ -1290,9 +1290,9 @@ func TestValidateEntry(t *testing.T) {
 				SetType: BitmapPort,
 				Port:    1080,
 			},
-			set: &IPSet{
-				Name:      "foo",
-				PortRange: "0-1079",
+			set: IPSet{
+				name:      "foo",
+				portRange: "0-1079",
 			},
 			desc:  "port number is NOT in the range of its ipset's port range",
 			valid: false,
@@ -1304,8 +1304,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: ProtocolTCP,
 				Port:     8080,
 			},
-			set: &IPSet{
-				Name: "bar",
+			set: IPSet{
+				name: "bar",
 			},
 			valid: true,
 		},
@@ -1316,8 +1316,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: ProtocolUDP,
 				Port:     0,
 			},
-			set: &IPSet{
-				Name: "bar",
+			set: IPSet{
+				name: "bar",
 			},
 			valid: true,
 		},
@@ -1328,8 +1328,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: ProtocolTCP,
 				Port:     1111,
 			},
-			set: &IPSet{
-				Name: "ipv6",
+			set: IPSet{
+				name: "ipv6",
 			},
 			valid: true,
 		},
@@ -1340,8 +1340,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: ProtocolTCP,
 				Port:     1234,
 			},
-			set: &IPSet{
-				Name: "empty-ip",
+			set: IPSet{
+				name: "empty-ip",
 			},
 			valid: false,
 		},
@@ -1352,8 +1352,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: ProtocolTCP,
 				Port:     8900,
 			},
-			set: &IPSet{
-				Name: "bad-ip",
+			set: IPSet{
+				name: "bad-ip",
 			},
 			valid: false,
 		},
@@ -1364,8 +1364,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: "",
 				Port:     8090,
 			},
-			set: &IPSet{
-				Name: "empty-protocol",
+			set: IPSet{
+				name: "empty-protocol",
 			},
 			valid: true,
 		},
@@ -1376,8 +1376,8 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: "ICMP",
 				Port:     8090,
 			},
-			set: &IPSet{
-				Name: "unsupported-protocol",
+			set: IPSet{
+				name: "unsupported-protocol",
 			},
 			valid: false,
 		},
@@ -1388,9 +1388,9 @@ func TestValidateEntry(t *testing.T) {
 				Protocol: "ICMP",
 				Port:     -1,
 			},
-			set: &IPSet{
+			set: IPSet{
 				// TODO: set name string with white space?
-				Name: "negative-port-number",
+				name: "negative-port-number",
 			},
 			valid: false,
 		},
@@ -1402,8 +1402,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				IP2:      "10.20.30.40",
 			},
-			set: &IPSet{
-				Name: "LOOP-BACK",
+			set: IPSet{
+				name: "LOOP-BACK",
 			},
 			valid: true,
 		},
@@ -1415,8 +1415,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				IP2:      "",
 			},
-			set: &IPSet{
-				Name: "empty IP2",
+			set: IPSet{
+				name: "empty IP2",
 			},
 			valid: false,
 		},
@@ -1428,8 +1428,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				IP2:      "foo",
 			},
-			set: &IPSet{
-				Name: "invalid IP2",
+			set: IPSet{
+				name: "invalid IP2",
 			},
 			valid: false,
 		},
@@ -1441,8 +1441,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     0,
 				IP2:      "1.2.3.4",
 			},
-			set: &IPSet{
-				Name: "zero port",
+			set: IPSet{
+				name: "zero port",
 			},
 			valid: true,
 		},
@@ -1454,8 +1454,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     10000,
 				IP2:      "1::4",
 			},
-			set: &IPSet{
-				Name: "IPV6",
+			set: IPSet{
+				name: "IPV6",
 				// TODO: check set's hash family
 			},
 			valid: true,
@@ -1468,8 +1468,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     1234,
 				IP2:      "1.2.3.4",
 			},
-			set: &IPSet{
-				Name: "empty-ip",
+			set: IPSet{
+				name: "empty-ip",
 			},
 			valid: false,
 		},
@@ -1481,8 +1481,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     8900,
 				IP2:      "10.20.30.41",
 			},
-			set: &IPSet{
-				Name: "bad-ip",
+			set: IPSet{
+				name: "bad-ip",
 			},
 			valid: false,
 		},
@@ -1494,8 +1494,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     8090,
 				IP2:      "10.20.30.41",
 			},
-			set: &IPSet{
-				Name: "sctp",
+			set: IPSet{
+				name: "sctp",
 			},
 			valid: true,
 		},
@@ -1507,8 +1507,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     -1,
 				IP2:      "100.200.30.41",
 			},
-			set: &IPSet{
-				Name: "negative-port-number",
+			set: IPSet{
+				name: "negative-port-number",
 			},
 			valid: false,
 		},
@@ -1520,8 +1520,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				Net:      "10.20.30.0/24",
 			},
-			set: &IPSet{
-				Name: "abc",
+			set: IPSet{
+				name: "abc",
 			},
 			valid: true,
 		},
@@ -1533,8 +1533,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     1122,
 				Net:      "",
 			},
-			set: &IPSet{
-				Name: "empty Net",
+			set: IPSet{
+				name: "empty Net",
 			},
 			valid: false,
 		},
@@ -1546,8 +1546,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     8080,
 				Net:      "x-y-z-w",
 			},
-			set: &IPSet{
-				Name: "invalid Net",
+			set: IPSet{
+				name: "invalid Net",
 			},
 			valid: false,
 		},
@@ -1559,8 +1559,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     0,
 				Net:      "10.1.0.0/16",
 			},
-			set: &IPSet{
-				Name: "zero port",
+			set: IPSet{
+				name: "zero port",
 			},
 			valid: true,
 		},
@@ -1572,8 +1572,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     80,
 				Net:      "2001:db8::/32",
 			},
-			set: &IPSet{
-				Name: "IPV6",
+			set: IPSet{
+				name: "IPV6",
 				// TODO: check set's hash family
 			},
 			valid: true,
@@ -1586,8 +1586,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     1234,
 				Net:      "1.2.3.4/22",
 			},
-			set: &IPSet{
-				Name: "empty-ip",
+			set: IPSet{
+				name: "empty-ip",
 			},
 			valid: false,
 		},
@@ -1599,8 +1599,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     8900,
 				Net:      "10.20.30.41/31",
 			},
-			set: &IPSet{
-				Name: "bad-ip",
+			set: IPSet{
+				name: "bad-ip",
 			},
 			valid: false,
 		},
@@ -1612,8 +1612,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     8090,
 				IP2:      "10.20.30.0/10",
 			},
-			set: &IPSet{
-				Name: "unsupported-protocol",
+			set: IPSet{
+				name: "unsupported-protocol",
 			},
 			valid: false,
 		},
@@ -1625,8 +1625,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     -1,
 				IP2:      "100.200.30.0/12",
 			},
-			set: &IPSet{
-				Name: "negative-port-number",
+			set: IPSet{
+				name: "negative-port-number",
 			},
 			valid: false,
 		},
@@ -1638,8 +1638,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				Net:      "192.168.3.0/0",
 			},
-			set: &IPSet{
-				Name: "net mask boundary 0",
+			set: IPSet{
+				name: "net mask boundary 0",
 			},
 			valid: true,
 		},
@@ -1651,8 +1651,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				Net:      "192.168.3.0/32",
 			},
-			set: &IPSet{
-				Name: "net mask boundary 32",
+			set: IPSet{
+				name: "net mask boundary 32",
 			},
 			valid: true,
 		},
@@ -1664,8 +1664,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				Net:      "192.168.3.1/33",
 			},
-			set: &IPSet{
-				Name: "invalid net mask",
+			set: IPSet{
+				name: "invalid net mask",
 			},
 			valid: false,
 		},
@@ -1677,8 +1677,8 @@ func TestValidateEntry(t *testing.T) {
 				Port:     53,
 				Net:      "192.168.3.1/-1",
 			},
-			set: &IPSet{
-				Name: "invalid net mask",
+			set: IPSet{
+				name: "invalid net mask",
 			},
 			valid: false,
 		},
