@@ -37,9 +37,9 @@ type Interface interface {
 	// DestroyAllSets deletes all sets.
 	DestroyAllSets() error
 	// CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
-	CreateSet(set *IPSet, ignoreExistErr bool) error
+	CreateSet(set IPSet, ignoreExistErr bool) error
 	// AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
-	AddEntry(entry string, set *IPSet, ignoreExistErr bool) error
+	AddEntry(entry string, set IPSet, ignoreExistErr bool) error
 	// DelEntry deletes one entry from the named set
 	DelEntry(entry string, set string) error
 	// Test test if an entry exists in the named set
@@ -72,74 +72,148 @@ var EntryMemberPattern = "(?m)^(.*\n)*Members:\n"
 // ipset version output is similar to "v6.10".
 var VersionPattern = "v[0-9]+\\.[0-9]+"
 
+// Option is variadic initializer for IPSet
+type Option func(set *IPSet)
+
+// NewIPSet returns a new IPSet struct
+func NewIPSet(name string, setType Type, opts ...Option) (IPSet, error) {
+	ret := IPSet{
+		name:    name,
+		setType: setType,
+	}
+	setIPSetDefaults(&ret)
+	for _, opt := range opts {
+		opt(&ret)
+	}
+	if err := ret.validate(); err != nil {
+		return IPSet{}, err
+	}
+	return ret, nil
+}
+
 // IPSet implements an Interface to a set.
 type IPSet struct {
-	// Name is the set name.
-	Name string
-	// SetType specifies the ipset type.
-	SetType Type
-	// HashFamily specifies the protocol family of the IP addresses to be stored in the set.
+	// name is the set name.
+	name string
+	// setType specifies the ipset type.
+	setType Type
+	// hashFamily specifies the protocol family of the IP addresses to be stored in the set.
 	// The default is inet, i.e IPv4.  If users want to use IPv6, they should specify inet6.
-	HashFamily string
-	// HashSize specifies the hash table size of ipset.
-	HashSize int
-	// MaxElem specifies the max element number of ipset.
-	MaxElem int
-	// PortRange specifies the port range of bitmap:port type ipset.
-	PortRange string
+	hashFamily string
+	// hashSize specifies the hash table size of ipset.
+	hashSize int
+	// maxElem specifies the max element number of ipset.
+	maxElem int
+	// portRange specifies the port range of bitmap:port type ipset.
+	portRange string
 	// comment message for ipset
-	Comment string
+	comment string
+}
+
+// HashFamily apply the hashFamily to IPSet, if not specified, the default
+// hashFamily is inet
+func HashFamily(hashFamily string) Option {
+	return func(set *IPSet) {
+		set.hashFamily = hashFamily
+	}
+}
+
+// HashSize apply the hashSize to IPSet, if not specified, the default hashSize
+// is 1024
+func HashSize(hashSize int) Option {
+	return func(set *IPSet) {
+		set.hashSize = hashSize
+	}
+}
+
+// MaxElem apply the maxElem to IPSet, if not specified, the default maxElem is
+// 65536
+func MaxElem(maxElem int) Option {
+	return func(set *IPSet) {
+		set.maxElem = maxElem
+	}
+}
+
+// PortRange apply the portRange to IPSet, if not specified, the default
+// portRange is 0-65535
+func PortRange(portRange string) Option {
+	return func(set *IPSet) {
+		set.portRange = portRange
+	}
+}
+
+// Comment apply the comment to IPSet, if not specified, no default value will
+// be set
+func Comment(comment string) Option {
+	return func(set *IPSet) {
+		set.comment = comment
+	}
+}
+
+// Name get name of ipSet
+func (set *IPSet) Name() string {
+	return set.name
+}
+
+// SetType get setType of ipSet
+func (set *IPSet) SetType() Type {
+	return set.setType
+}
+
+// GetComment get comment of ipSet
+func (set *IPSet) Comment() string {
+	return set.comment
 }
 
 // Validate checks if a given ipset is valid or not.
-func (set *IPSet) Validate() error {
+func (set *IPSet) validate() error {
 	// Check if protocol is valid for `HashIPPort`, `HashIPPortIP` and `HashIPPortNet` type set.
-	if set.SetType == HashIPPort || set.SetType == HashIPPortIP || set.SetType == HashIPPortNet {
-		if err := validateHashFamily(set.HashFamily); err != nil {
+	if set.setType == HashIPPort || set.setType == HashIPPortIP || set.setType == HashIPPortNet {
+		if err := validateHashFamily(set.hashFamily); err != nil {
 			return err
 		}
 	}
 	// check set type
-	if err := validateIPSetType(set.SetType); err != nil {
+	if err := validateIPSetType(set.setType); err != nil {
 		return err
 	}
 	// check port range for bitmap type set
-	if set.SetType == BitmapPort {
-		if err := validatePortRange(set.PortRange); err != nil {
+	if set.setType == BitmapPort {
+		if err := validatePortRange(set.portRange); err != nil {
 			return err
 		}
 	}
 	// check hash size value of ipset
-	if set.HashSize <= 0 {
-		return fmt.Errorf("invalid HashSize: %d", set.HashSize)
+	if set.hashSize <= 0 {
+		return fmt.Errorf("invalid HashSize: %d", set.hashSize)
 	}
 	// check max elem value of ipset
-	if set.MaxElem <= 0 {
-		return fmt.Errorf("invalid MaxElem %d", set.MaxElem)
+	if set.maxElem <= 0 {
+		return fmt.Errorf("invalid MaxElem %d", set.maxElem)
 	}
 
 	return nil
 }
 
 // setIPSetDefaults sets some IPSet fields if not present to their default values.
-func (set *IPSet) setIPSetDefaults() {
+func setIPSetDefaults(set *IPSet) {
 	// Setting default values if not present
-	if set.HashSize == 0 {
-		set.HashSize = 1024
+	if set.hashSize == 0 {
+		set.hashSize = 1024
 	}
-	if set.MaxElem == 0 {
-		set.MaxElem = 65536
+	if set.maxElem == 0 {
+		set.maxElem = 65536
 	}
 	// Default protocol is IPv4
-	if set.HashFamily == "" {
-		set.HashFamily = ProtocolFamilyIPV4
+	if set.hashFamily == "" {
+		set.hashFamily = ProtocolFamilyIPV4
 	}
 	// Default ipset type is "hash:ip,port"
-	if len(set.SetType) == 0 {
-		set.SetType = HashIPPort
+	if len(set.setType) == 0 {
+		set.setType = HashIPPort
 	}
-	if len(set.PortRange) == 0 {
-		set.PortRange = DefaultPortRange
+	if len(set.portRange) == 0 {
+		set.portRange = DefaultPortRange
 	}
 }
 
@@ -163,7 +237,7 @@ type Entry struct {
 }
 
 // Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
-func (e *Entry) Validate(set *IPSet) bool {
+func (e *Entry) Validate(set IPSet) bool {
 	if e.Port < 0 {
 		klog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
 		return false
@@ -203,17 +277,13 @@ func (e *Entry) Validate(set *IPSet) bool {
 		}
 	case BitmapPort:
 		// check if port number satisfies its ipset's requirement of port range
-		if set == nil {
-			klog.Errorf("Unable to reference ip set where the entry %v exists", e)
-			return false
-		}
-		begin, end, err := parsePortRange(set.PortRange)
+		begin, end, err := parsePortRange(set.portRange)
 		if err != nil {
-			klog.Errorf("Failed to parse set %v port range %s for ipset %v, error: %v", set, set.PortRange, set, err)
+			klog.Errorf("Failed to parse set %v port range %s for ipset %v, error: %v", set, set.portRange, set, err)
 			return false
 		}
 		if e.Port < begin || e.Port > end {
-			klog.Errorf("Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
+			klog.Errorf("Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.portRange, set)
 			return false
 		}
 	}
@@ -226,7 +296,7 @@ func (e *Entry) String() string {
 	switch e.SetType {
 	case HashIP:
 		// Entry{192.168.1.1} -> 192.168.1.1
-		return fmt.Sprintf("%s", e.IP)
+		return e.IP
 	case HashIPPort:
 		// Entry{192.168.1.1, udp, 53} -> 192.168.1.1,udp:53
 		// Entry{192.168.1.2, tcp, 8080} -> 192.168.1.2,tcp:8080
@@ -248,7 +318,7 @@ func (e *Entry) String() string {
 }
 
 // checkIPandProtocol checks if IP and Protocol of Entry is valid.
-func (e *Entry) checkIPandProtocol(set *IPSet) bool {
+func (e *Entry) checkIPandProtocol(set IPSet) bool {
 	// set default protocol to tcp if empty
 	if len(e.Protocol) == 0 {
 		e.Protocol = ProtocolTCP
@@ -259,7 +329,7 @@ func (e *Entry) checkIPandProtocol(set *IPSet) bool {
 }
 
 // checkIP checks if IP of Entry is valid.
-func (e *Entry) checkIP(set *IPSet) bool {
+func (e *Entry) checkIP(set IPSet) bool {
 	if netutils.ParseIPSloppy(e.IP) == nil {
 		klog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
 		return false
@@ -280,12 +350,12 @@ func New(exec utilexec.Interface) Interface {
 }
 
 // CreateSet creates a new set, it will ignore error when the set already exists if ignoreExistErr=true.
-func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
+func (runner *runner) CreateSet(set IPSet, ignoreExistErr bool) error {
 	// sets some IPSet fields if not present to their default values.
-	set.setIPSetDefaults()
+	setIPSetDefaults(&set)
 
 	// Validate ipset before creating
-	if err := set.Validate(); err != nil {
+	if err := set.validate(); err != nil {
 		return err
 	}
 	return runner.createSet(set, ignoreExistErr)
@@ -293,23 +363,23 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 
 // If ignoreExistErr is set to true, then the -exist option of ipset will be specified, ipset ignores the error
 // otherwise raised when the same set (setname and create parameters are identical) already exists.
-func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
-	args := []string{"create", set.Name, string(set.SetType)}
-	if set.SetType == HashIPPortIP || set.SetType == HashIPPort || set.SetType == HashIPPortNet || set.SetType == HashIP {
+func (runner *runner) createSet(set IPSet, ignoreExistErr bool) error {
+	args := []string{"create", set.name, string(set.setType)}
+	if set.setType == HashIPPortIP || set.setType == HashIPPort || set.setType == HashIPPortNet || set.setType == HashIP {
 		args = append(args,
-			"family", set.HashFamily,
-			"hashsize", strconv.Itoa(set.HashSize),
-			"maxelem", strconv.Itoa(set.MaxElem),
+			"family", set.hashFamily,
+			"hashsize", strconv.Itoa(set.hashSize),
+			"maxelem", strconv.Itoa(set.maxElem),
 		)
 	}
-	if set.SetType == BitmapPort {
-		args = append(args, "range", set.PortRange)
+	if set.setType == BitmapPort {
+		args = append(args, "range", set.portRange)
 	}
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}
 	if _, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("error creating ipset %s, error: %v", set.Name, err)
+		return fmt.Errorf("error creating ipset %s, error: %v", set.name, err)
 	}
 	return nil
 }
@@ -317,8 +387,8 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 // AddEntry adds a new entry to the named set.
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
-func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) error {
-	args := []string{"add", set.Name, entry}
+func (runner *runner) AddEntry(entry string, set IPSet, ignoreExistErr bool) error {
+	args := []string{"add", set.name, entry}
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}
