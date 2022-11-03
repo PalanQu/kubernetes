@@ -35,10 +35,13 @@ func TestSetEntry(t *testing.T) {
 		t.Errorf("Unexpected version mismatch, expected: %s, got: %s", testVersion, version)
 	}
 	// create a set
-	set := &ipset.IPSet{
-		Name:       "foo",
-		SetType:    ipset.HashIPPort,
-		HashFamily: ipset.ProtocolFamilyIPV4,
+	set, err := ipset.NewIPSet(
+		"foo",
+		ipset.HashIPPort,
+		ipset.HashFamily(ipset.ProtocolFamilyIPV4),
+	)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 	if err := fake.CreateSet(set, true); err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -53,7 +56,7 @@ func TestSetEntry(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	entries, err := fake.ListEntries(set.Name)
+	entries, err := fake.ListEntries(set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -66,7 +69,7 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// test entries
-	found, err := fake.TestEntry("192.168.1.1,tcp:8080", set.Name)
+	found, err := fake.TestEntry("192.168.1.1,tcp:8080", set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -74,7 +77,7 @@ func TestSetEntry(t *testing.T) {
 		t.Errorf("Unexpected entry 192.168.1.1,tcp:8080 not found")
 	}
 
-	found, err = fake.TestEntry("192.168.1.2,tcp:8081", set.Name)
+	found, err = fake.TestEntry("192.168.1.2,tcp:8081", set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -83,10 +86,10 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// delete entry from a given set
-	if err := fake.DelEntry("192.168.1.1,tcp:8080", set.Name); err != nil {
+	if err := fake.DelEntry("192.168.1.1,tcp:8080", set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	entries, err = fake.ListEntries(set.Name)
+	entries, err = fake.ListEntries(set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -99,22 +102,24 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// Flush set
-	if err := fake.FlushSet(set.Name); err != nil {
+	if err := fake.FlushSet(set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	entries, err = fake.ListEntries(set.Name)
+	entries, err = fake.ListEntries(set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if len(entries) != 0 {
 		t.Errorf("Expected 0 entries, got %d, entries: %v", len(entries), entries)
 	}
-
 	// create another set
-	set2 := &ipset.IPSet{
-		Name:       "bar",
-		SetType:    ipset.HashIPPortIP,
-		HashFamily: ipset.ProtocolFamilyIPV6,
+	set2, err := ipset.NewIPSet(
+		"bar",
+		ipset.HashIPPortIP,
+		ipset.HashFamily(ipset.ProtocolFamilyIPV6),
+	)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 	if err := fake.CreateSet(set2, true); err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -133,14 +138,11 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// Destroy a given set
-	if err := fake.DestroySet(set.Name); err != nil {
+	if err := fake.DestroySet(set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if fake.Sets[set.Name] != nil {
-		t.Errorf("Unexpected set: %v", fake.Sets[set.Name])
-	}
-	if fake.Entries[set.Name] != nil {
-		t.Errorf("Unexpected entries: %v", fake.Entries[set.Name])
+	if fake.Entries[set.Name()] != nil {
+		t.Errorf("Unexpected entries: %v", fake.Entries[set.Name()])
 	}
 
 	// Destroy all sets

@@ -28,7 +28,7 @@ type FakeIPSet struct {
 	// version of ipset util
 	Version string
 	// The key of Sets map is the ip set name
-	Sets map[string]*ipset.IPSet
+	Sets map[string]ipset.IPSet
 	// The key of Entries map is the ip set name where the entries exists
 	Entries map[string]sets.String
 }
@@ -37,7 +37,7 @@ type FakeIPSet struct {
 func NewFake(version string) *FakeIPSet {
 	return &FakeIPSet{
 		Version: version,
-		Sets:    make(map[string]*ipset.IPSet),
+		Sets:    make(map[string]ipset.IPSet),
 		Entries: make(map[string]sets.String),
 	}
 }
@@ -54,7 +54,7 @@ func (f *FakeIPSet) FlushSet(set string) error {
 	}
 
 	// delete all entry elements
-	for true {
+	for {
 		if _, has := f.Entries[set].PopAny(); has {
 			continue
 		}
@@ -78,30 +78,30 @@ func (f *FakeIPSet) DestroyAllSets() error {
 }
 
 // CreateSet is part of interface.
-func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
-	if f.Sets[set.Name] != nil {
+func (f *FakeIPSet) CreateSet(set ipset.IPSet, ignoreExistErr bool) error {
+	if _, ok := f.Sets[set.Name()]; ok {
 		if !ignoreExistErr {
 			// already exists
-			return fmt.Errorf("Set cannot be created: set with the same name already exists")
+			return fmt.Errorf("set cannot be created: set with the same name already exists")
 		}
 		return nil
 	}
-	f.Sets[set.Name] = set
+	f.Sets[set.Name()] = set
 	// initialize entry map
-	f.Entries[set.Name] = sets.NewString()
+	f.Entries[set.Name()] = sets.NewString()
 	return nil
 }
 
 // AddEntry is part of interface.
-func (f *FakeIPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
-	if f.Entries[set.Name].Has(entry) {
+func (f *FakeIPSet) AddEntry(entry string, set ipset.IPSet, ignoreExistErr bool) error {
+	if f.Entries[set.Name()].Has(entry) {
 		if !ignoreExistErr {
 			// already exists
-			return fmt.Errorf("Element cannot be added to the set: it's already added")
+			return fmt.Errorf("element cannot be added to the set: it's already added")
 		}
 		return nil
 	}
-	f.Entries[set.Name].Insert(entry)
+	f.Entries[set.Name()].Insert(entry)
 	return nil
 }
 

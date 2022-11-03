@@ -513,7 +513,11 @@ func NewProxier(ipt utiliptables.Interface,
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
 	for _, is := range ipsetInfo {
-		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, (ipFamily == v1.IPv6Protocol), is.comment)
+		set, err := NewIPSet(ipset, is.name, is.setType, (ipFamily == v1.IPv6Protocol), is.comment)
+		if err != nil {
+			return nil, err
+		}
+		proxier.ipsetList[is.name] = set
 	}
 	burstSyncs := 2
 	klog.V(2).InfoS("ipvs sync params", "ipFamily", ipt.Protocol(), "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
@@ -1197,7 +1201,7 @@ func (proxier *Proxier) syncProxyRules() {
 				SetType:  utilipset.HashIPPortIP,
 			}
 			if valid := proxier.ipsetList[kubeLoopBackIPSet].validateEntry(entry); !valid {
-				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoopBackIPSet].Name)
+				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoopBackIPSet].Name())
 				continue
 			}
 			proxier.ipsetList[kubeLoopBackIPSet].activeEntries.Insert(entry.String())
@@ -1214,7 +1218,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// add service Cluster IP:Port to kubeServiceAccess ip set for the purpose of solving hairpin.
 		// proxier.kubeServiceAccessSet.activeEntries.Insert(entry.String())
 		if valid := proxier.ipsetList[kubeClusterIPSet].validateEntry(entry); !valid {
-			klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeClusterIPSet].Name)
+			klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeClusterIPSet].Name())
 			continue
 		}
 		proxier.ipsetList[kubeClusterIPSet].activeEntries.Insert(entry.String())
@@ -1259,14 +1263,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 			if svcInfo.ExternalPolicyLocal() {
 				if valid := proxier.ipsetList[kubeExternalIPLocalSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeExternalIPLocalSet].Name)
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeExternalIPLocalSet].Name())
 					continue
 				}
 				proxier.ipsetList[kubeExternalIPLocalSet].activeEntries.Insert(entry.String())
 			} else {
 				// We have to SNAT packets to external IPs.
 				if valid := proxier.ipsetList[kubeExternalIPSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeExternalIPSet].Name)
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeExternalIPSet].Name())
 					continue
 				}
 				proxier.ipsetList[kubeExternalIPSet].activeEntries.Insert(entry.String())
@@ -1309,14 +1313,14 @@ func (proxier *Proxier) syncProxyRules() {
 			// If we are proxying globally, we need to masquerade in case we cross nodes.
 			// If we are proxying only locally, we can retain the source IP.
 			if valid := proxier.ipsetList[kubeLoadBalancerSet].validateEntry(entry); !valid {
-				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSet].Name)
+				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSet].Name())
 				continue
 			}
 			proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
 			// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
 			if svcInfo.ExternalPolicyLocal() {
 				if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerLocalSet].Name)
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerLocalSet].Name())
 					continue
 				}
 				proxier.ipsetList[kubeLoadBalancerLocalSet].activeEntries.Insert(entry.String())
@@ -1326,7 +1330,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// This currently works for loadbalancers that preserves source ips.
 				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
 				if valid := proxier.ipsetList[kubeLoadBalancerFWSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerFWSet].Name)
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerFWSet].Name())
 					continue
 				}
 				proxier.ipsetList[kubeLoadBalancerFWSet].activeEntries.Insert(entry.String())
@@ -1342,7 +1346,7 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					// enumerate all white list source cidr
 					if valid := proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].validateEntry(entry); !valid {
-						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].Name)
+						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].Name())
 						continue
 					}
 					proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
@@ -1366,7 +1370,7 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					// enumerate all white list source ip
 					if valid := proxier.ipsetList[kubeLoadBalancerSourceIPSet].validateEntry(entry); !valid {
-						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceIPSet].Name)
+						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerSourceIPSet].Name())
 						continue
 					}
 					proxier.ipsetList[kubeLoadBalancerSourceIPSet].activeEntries.Insert(entry.String())
@@ -1472,7 +1476,7 @@ func (proxier *Proxier) syncProxyRules() {
 				entryInvalidErr := false
 				for _, entry := range entries {
 					if valid := nodePortSet.validateEntry(entry); !valid {
-						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", nodePortSet.Name)
+						klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", nodePortSet.Name())
 						entryInvalidErr = true
 						break
 					}
@@ -1501,7 +1505,7 @@ func (proxier *Proxier) syncProxyRules() {
 					entryInvalidErr := false
 					for _, entry := range entries {
 						if valid := nodePortLocalSet.validateEntry(entry); !valid {
-							klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", nodePortLocalSet.Name)
+							klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", nodePortLocalSet.Name())
 							entryInvalidErr = true
 							break
 						}
@@ -1548,7 +1552,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			if valid := nodePortSet.validateEntry(entry); !valid {
-				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", nodePortSet.Name)
+				klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", nodePortSet.Name())
 				continue
 			}
 			nodePortSet.activeEntries.Insert(entry.String())
@@ -1674,7 +1678,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			}
 			args = append(args,
 				"-m", "comment", "--comment", proxier.ipsetList[set.name].getComment(),
-				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
+				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name(),
 				set.matchType,
 			)
 			if set.table == utiliptables.TableFilter {
@@ -1689,7 +1693,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeClusterIPSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name(),
 		)
 		if proxier.masqueradeAll {
 			proxier.natRules.Write(
@@ -1740,7 +1744,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name(),
 			"dst,dst",
 		)
 		proxier.natRules.Write(args, "-j", string(kubeMarkMasqChain))
@@ -1751,7 +1755,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPLocalSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name(),
 			"dst,dst",
 		)
 		externalIPRules(args)
@@ -1805,7 +1809,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	proxier.filterRules.Write(
 		"-A", string(kubeNodePortChain),
 		"-m", "comment", "--comment", proxier.ipsetList[kubeHealthCheckNodePortSet].getComment(),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst",
+		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name(), "dst",
 		"-j", "ACCEPT",
 	)
 
@@ -1813,17 +1817,17 @@ func (proxier *Proxier) writeIptablesRules() {
 	// https://github.com/kubernetes/kubernetes/issues/72236
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name, "dst,dst", "-j", "RETURN")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name(), "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name, "dst,dst", "-j", "RETURN")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name(), "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "RETURN")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name(), "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
 		"-m", "conntrack", "--ctstate", "NEW",
-		"-m", "set", "--match-set", proxier.ipsetList[kubeIPVSSet].Name, "dst", "-j", "REJECT")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeIPVSSet].Name(), "dst", "-j", "REJECT")
 
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
@@ -1868,7 +1872,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 	for _, set := range sets {
 		var matchType string
 		if !proxier.ipsetList[set].isEmpty() {
-			switch proxier.ipsetList[set].SetType {
+			switch proxier.ipsetList[set].SetType() {
 			case utilipset.BitmapPort:
 				matchType = "dst"
 			default:
@@ -1876,7 +1880,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 			}
 			proxier.natRules.Write(
 				"-A", string(kubeServicesChain),
-				"-m", "set", "--match-set", proxier.ipsetList[set].Name, matchType,
+				"-m", "set", "--match-set", proxier.ipsetList[set].Name(), matchType,
 				"-j", "ACCEPT",
 			)
 		}

@@ -99,7 +99,7 @@ type IPSet struct {
 }
 
 // NewIPSet initialize a new IPSet struct
-func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, isIPv6 bool, comment string) *IPSet {
+func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, isIPv6 bool, comment string) (*IPSet, error) {
 	hashFamily := utilipset.ProtocolFamilyIPV4
 	if isIPv6 {
 		hashFamily = utilipset.ProtocolFamilyIPV6
@@ -118,21 +118,26 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 			}
 		}
 	}
+
+	s, err := utilipset.NewIPSet(
+		name,
+		setType,
+		utilipset.HashFamily(hashFamily),
+		utilipset.Comment(comment),
+	)
+	if err != nil {
+		return nil, err
+	}
 	set := &IPSet{
-		IPSet: utilipset.IPSet{
-			Name:       name,
-			SetType:    setType,
-			HashFamily: hashFamily,
-			Comment:    comment,
-		},
+		IPSet:         s,
 		activeEntries: sets.NewString(),
 		handle:        handle,
 	}
-	return set
+	return set, nil
 }
 
 func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
-	return entry.Validate(&set.IPSet)
+	return entry.Validate(set.IPSet)
 }
 
 func (set *IPSet) isEmpty() bool {
@@ -140,7 +145,7 @@ func (set *IPSet) isEmpty() bool {
 }
 
 func (set *IPSet) getComment() string {
-	return fmt.Sprintf("\"%s\"", set.Comment)
+	return fmt.Sprintf("\"%s\"", set.Comment())
 }
 
 func (set *IPSet) resetEntries() {
@@ -148,7 +153,7 @@ func (set *IPSet) resetEntries() {
 }
 
 func (set *IPSet) syncIPSetEntries() {
-	appliedEntries, err := set.handle.ListEntries(set.Name)
+	appliedEntries, err := set.handle.ListEntries(set.Name())
 	if err != nil {
 		klog.ErrorS(err, "Failed to list ip set entries")
 		return
@@ -163,27 +168,27 @@ func (set *IPSet) syncIPSetEntries() {
 	if !set.activeEntries.Equal(currentIPSetEntries) {
 		// Clean legacy entries
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
-			if err := set.handle.DelEntry(entry, set.Name); err != nil {
+			if err := set.handle.DelEntry(entry, set.Name()); err != nil {
 				if !utilipset.IsNotFoundError(err) {
-					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
+					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name())
 				}
 			} else {
-				klog.V(3).InfoS("Successfully deleted legacy ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
+				klog.V(3).InfoS("Successfully deleted legacy ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name())
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
-			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
+			if err := set.handle.AddEntry(entry, set.IPSet, true); err != nil {
+				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name())
 			} else {
-				klog.V(3).InfoS("Successfully added ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
+				klog.V(3).InfoS("Successfully added ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name())
 			}
 		}
 	}
 }
 
 func ensureIPSet(set *IPSet) error {
-	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+	if err := set.handle.CreateSet(set.IPSet, true); err != nil {
 		klog.ErrorS(err, "Failed to make sure existence of ip set", "ipSet", set)
 		return err
 	}
